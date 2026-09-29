@@ -3,62 +3,167 @@
 
 #include "Experiment.h"
 
+#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <stdexcept>
 #include <vector>
 
+struct InputData
+{
+    int n = 0;
+    int m = 0;
+    int repetitions = 0;
+};
+
+bool isValid(const InputData& data)
+{
+    return data.n > 0
+        && data.m >= 0
+        && 1LL * data.m <= 1LL * data.n * data.n
+        && data.repetitions > 0;
+}
+
+std::vector<InputData> readInputData(const char* fileName)
+{
+    std::ifstream fin(fileName);
+
+    if (!fin.is_open())
+    {
+        return {};
+    }
+
+    std::vector<InputData> dataSets;
+    InputData data;
+
+    while (fin >> data.n >> data.m >> data.repetitions)
+    {
+        if (!isValid(data))
+        {
+            throw std::runtime_error("Incorrect data in input.txt");
+        }
+
+        dataSets.push_back(data);
+    }
+
+    if (!fin.eof())
+    {
+        throw std::runtime_error("Incorrect data in input.txt");
+    }
+
+    return dataSets;
+}
+
+void writeInputData(
+    const char* fileName,
+    const std::vector<InputData>& dataSets
+)
+{
+    std::ofstream fout(fileName, std::ios::trunc);
+
+    if (!fout.is_open())
+    {
+        throw std::runtime_error("Cannot write input.txt");
+    }
+
+    for (const InputData& data : dataSets)
+    {
+        fout
+            << data.n << ' '
+            << data.m << ' '
+            << data.repetitions << '\n';
+    }
+}
+
+std::vector<InputData> askForNewInputData()
+{
+    int count = 0;
+
+    std::cout
+        << "All input data have been used.\n"
+        << "How many new data sets do you want to add? ";
+
+    if (!(std::cin >> count) || count <= 0)
+    {
+        throw std::runtime_error("Incorrect number of data sets");
+    }
+
+    std::vector<InputData> dataSets;
+    dataSets.reserve(count);
+
+    for (int i = 0; i < count; ++i)
+    {
+        InputData data;
+
+        std::cout
+            << "Data set " << (i + 1)
+            << " (n m repetitions): ";
+
+        if (!(std::cin >> data.n >> data.m >> data.repetitions)
+            || !isValid(data))
+        {
+            throw std::runtime_error("Incorrect input data");
+        }
+
+        dataSets.push_back(data);
+    }
+
+    return dataSets;
+}
+
 int main()
 {
     try
     {
-        int n = 0;
-        int m = 0;
-        int repetitions = 0;
+        std::vector<InputData> dataSets =
+            readInputData("input.txt");
 
-        std::cout << "Board size n: ";
-        if (!(std::cin >> n))
+        if (dataSets.empty())
         {
-            throw std::runtime_error("n must be an integer.");
+            dataSets = askForNewInputData();
+            writeInputData("input.txt", dataSets);
         }
 
-        std::cout << "Number of selected cells m: ";
-        if (!(std::cin >> m))
-        {
-            throw std::runtime_error("m must be an integer.");
-        }
+        const InputData current = dataSets.front();
 
-        std::cout << "Number of experiment repetitions: ";
-        if (!(std::cin >> repetitions))
-        {
-            throw std::runtime_error(
-                "The number of repetitions must be an integer."
-            );
-        }
+        const int n = current.n;
+        const int m = current.m;
+        const int repetitions = current.repetitions;
 
         const Statistics statistics =
             runExperiments(n, m, repetitions);
 
-        const long long totalCells = 1LL * n * n;
+        const long long totalCells =
+            1LL * n * n;
 
         const double ratio =
             static_cast<double>(m) /
             static_cast<double>(totalCells);
 
-        std::cout << std::fixed << std::setprecision(3);
+        std::ofstream fout("output.txt");
 
-        std::cout
-            << "\nFor n = " << n
+        if (!fout.is_open())
+        {
+            throw std::runtime_error(
+                "Cannot create output.txt"
+            );
+        }
+
+        fout << std::fixed
+             << std::setprecision(3);
+
+        fout
+            << "For n = " << n
             << ", m = " << m
             << ", m/n^2 = " << ratio
             << '\n';
 
-        std::cout
-            << "Mean free-zone size   = "
+        fout
+            << "Mean free-zone size = "
             << statistics.mean
             << '\n';
 
-        std::cout
+        fout
             << "Median free-zone size = "
             << statistics.median
             << "\n\n";
@@ -66,9 +171,9 @@ int main()
         const std::vector<StudyPoint> study =
             studyDependence(n, repetitions);
 
-        std::cout << "Dependence on m/n^2:\n";
+        fout << "Dependence on m/n^2:\n";
 
-        std::cout
+        fout
             << std::setw(10) << "m/n^2"
             << std::setw(10) << "m"
             << std::setw(18) << "mean"
@@ -77,13 +182,40 @@ int main()
 
         for (const StudyPoint& point : study)
         {
-            std::cout
-                << std::setw(10) << point.ratio
-                << std::setw(10) << point.m
-                << std::setw(18) << point.meanFree
-                << std::setw(18) << point.medianFree
+            fout
+                << std::setw(10)
+                << point.ratio
+
+                << std::setw(10)
+                << point.m
+
+                << std::setw(18)
+                << point.meanFree
+
+                << std::setw(18)
+                << point.medianFree
+
                 << '\n';
         }
+
+        fout.close();
+
+        dataSets.erase(dataSets.begin());
+
+        if (dataSets.empty())
+        {
+            dataSets = askForNewInputData();
+        }
+
+        writeInputData("input.txt", dataSets);
+
+        std::cout
+            << "Calculation completed.\n"
+            << "Results written to output.txt\n"
+            << "Used input: n = " << n
+            << ", m = " << m
+            << ", repetitions = " << repetitions
+            << '\n';
 
         return 0;
     }
