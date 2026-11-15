@@ -20,7 +20,6 @@ bool isValid(const InputData& data)
 {
     return data.n > 0
         && data.m >= 0
-        && 1LL * data.m <= 1LL * data.n * data.n
         && data.repetitions > 0;
 }
 
